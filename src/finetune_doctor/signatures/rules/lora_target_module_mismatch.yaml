@@ -1,0 +1,59 @@
+# lora_target_module_mismatch.yaml — finetune-doctor signature
+#
+# Matches RuntimeError with shape/size mismatch phrasing that typically
+# occurs when PEFT's LoRA target_modules list doesn't match the actual
+# module names in the model architecture.
+#
+# Modeled on real errors seen with PEFT + newer/MoE model architectures:
+#   RuntimeError: size mismatch for base_model.model.layers.0.self_attn.q_proj.lora_A.weight:
+#     copying a param with shape torch.Size([16, 4096]) from checkpoint,
+#     the shape in current model is torch.Size([16, 5120]).
+# and:
+#   RuntimeError: Error(s) in loading state_dict for PeftModel:
+#     size mismatch for base_model.model.layers.0.self_attn.q_proj.lora_A.default.weight
+
+id: lora_target_module_mismatch
+name: "LoRA target module name mismatch"
+specificity: 75
+
+# Modeled on real PyTorch shape mismatch errors during adapter loading:
+#   RuntimeError: Error(s) in loading state_dict for PeftModel:
+#     size mismatch for base_model.model.layers.0.self_attn.q_proj.lora_A.default.weight
+# We remove generic "size mismatch" and "shape mismatch" to prevent false matching
+# on unrelated errors (e.g., dataloader collation mismatches).
+match:
+  exception_type: "RuntimeError"
+  traceback_contains_any:
+    - "lora_A"
+    - "lora_B"
+  traceback_contains_all:
+    - "size mismatch"
+    - "base_model.model"
+
+
+
+explanation: >
+  The LoRA target_modules list in your PEFT/LoRA configuration doesn't
+  match the actual layer names in this model's architecture.  This is
+  very common when switching between model families (e.g. Llama vs.
+  Mistral vs. Qwen vs. Gemma) or when using MoE-style architectures
+  where attention and MLP layer names differ from the standard
+  Llama-style naming convention (q_proj, k_proj, v_proj, o_proj).
+
+fix: >
+  1. Inspect the model's actual module names by running:
+     for name, _ in model.named_modules(): print(name)
+     Look for the attention and MLP projection layer names.
+
+  2. Update target_modules in your LoRA config to match the names you
+     found.  Common patterns:
+     - Llama/Mistral: ["q_proj", "k_proj", "v_proj", "o_proj"]
+     - Qwen: ["c_attn", "c_proj"]
+     - GPT-NeoX: ["query_key_value", "dense"]
+
+  3. If your PEFT version supports it, try target_modules="all-linear"
+     to automatically target all linear layers — this avoids the
+     name-matching problem entirely.
+
+  4. If loading a LoRA adapter trained on a different base model,
+     verify the adapter was trained on a compatible architecture.

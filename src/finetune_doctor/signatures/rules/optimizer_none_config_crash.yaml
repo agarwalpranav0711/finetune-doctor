@@ -1,0 +1,38 @@
+# optimizer_none_config_crash.yaml — finetune-doctor signature
+#
+# Matches TypeError from an optimizer receiving None for a required config
+# field.  Common with newer optimizer integrations (e.g. adam-mini, SOAP,
+# Prodigy) where PEFT or custom code doesn't set all required hyperparams.
+#
+# Modeled on real errors like:
+#   TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'
+#   TypeError: '<' not supported between instances of 'NoneType' and 'float'
+# occurring during optimizer.step() or __init__.
+
+id: optimizer_none_config_crash
+name: "Optimizer received None for a required config field"
+specificity: 60
+
+match:
+  exception_type: "TypeError"
+  traceback_contains_any:
+    - "NoneType"
+
+explanation: >
+  An optimizer (or its underlying math) received a None value where a
+  numeric parameter was expected.  This typically happens when a newer
+  or third-party optimizer integration (e.g. adam-mini, SOAP, Prodigy)
+  requires configuration fields that aren't set by default in the
+  trainer or PEFT wrapper — so they arrive as None at runtime.
+
+fix: >
+  1. Check your optimizer's documentation for ALL required config fields
+     and make sure each one is explicitly set in your TrainingArguments
+     or optimizer constructor — don't rely on defaults for newer
+     optimizer integrations.
+  2. If using a custom optimizer with Hugging Face Trainer, verify that
+     your optimizer_cls and optimizer_kwargs are both fully populated:
+     TrainingArguments(..., optim="adamw_torch",
+     optim_args="lr=1e-4,weight_decay=0.01")
+  3. If using PEFT with a non-standard optimizer, check that the PEFT
+     wrapper is passing through all required optimizer kwargs.

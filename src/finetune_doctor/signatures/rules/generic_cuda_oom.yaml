@@ -1,0 +1,39 @@
+# generic_cuda_oom.yaml — finetune-doctor signature
+#
+# Catch-all for any CUDA OutOfMemoryError not matched by a more specific
+# signature.  Deliberately low specificity so signatures like
+# oom_during_eval (80) or chatml_format_oom (70) always win when they
+# match.
+
+id: generic_cuda_oom
+name: "CUDA out of memory"
+specificity: 20
+
+match:
+  exception_type: "OutOfMemoryError"
+  # No traceback_contains_any — matches any OOM not caught by a
+  # more specific signature.
+
+explanation: >
+  Your training configuration requires more GPU memory than is currently
+  available.  This is the single most common fine-tuning failure — the
+  combination of model size, batch size, sequence length, and precision
+  settings exceeds what your GPU can hold.
+
+fix: >
+  Try one or more of the following (in order of impact):
+
+  1. Reduce per_device_train_batch_size (halve it and retry).
+
+  2. Enable gradient checkpointing (model.gradient_checkpointing_enable()
+     or gradient_checkpointing=True in training args) — trades ~30% more
+     time for ~60% less activation memory.
+
+  3. Reduce max_seq_length / cutoff_len — shorter sequences use
+     quadratically less memory in attention.
+
+  4. Use a smaller or more aggressively quantized model (e.g. 4-bit
+     QLoRA instead of 8-bit or full precision).
+
+  5. If using DeepSpeed or FSDP, ensure offloading is enabled for
+     optimizer states.

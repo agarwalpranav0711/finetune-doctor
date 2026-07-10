@@ -1,0 +1,53 @@
+# multi_gpu_backward_oom.yaml — finetune-doctor signature
+#
+# Matches OOM occurring during the backward pass, which is distinct from
+# the eval-time OOM (oom_during_eval, specificity 80) and the generic
+# OOM catch-all (generic_cuda_oom, specificity 20).
+#
+# Specificity reasoning:
+#   - 45 is above generic_cuda_oom (20) because backward-pass OOM is more
+#     specific — it tells us the crash happened during gradient computation,
+#     which enables targeted advice (gradient checkpointing, alloc_conf).
+#   - 45 is well below oom_during_eval (80) because eval OOM has a much
+#     more actionable fix (just lower eval batch size), while backward OOM
+#     has broader possible causes.
+#   - 45 is below chatml_format_oom (70) and other mid-range signatures
+#     because backward OOM is a reasonably common pattern but not a
+#     pinpoint diagnosis like those.
+#
+# Modeled on real errors:
+#   OutOfMemoryError: CUDA out of memory.
+#   occurring in torch/autograd/__init__.py (backward)
+#   or torch/autograd/graph.py
+
+id: multi_gpu_backward_oom
+name: "Out of memory during backward pass (gradient computation)"
+specificity: 45
+
+match:
+  exception_type: "OutOfMemoryError"
+  traceback_contains_any:
+    - "backward"
+    - "autograd"
+    - "grad_fn"
+
+explanation: >
+  Training ran out of GPU memory during the backward pass (gradient
+  computation).  This typically means the model + optimizer states +
+  activation memory for the current batch size exceed available VRAM.
+  In multi-GPU setups this can be compounded by DDP's gradient
+  all-reduce communication buffers.
+
+fix: >
+  1. Reduce per_device_train_batch_size — this directly reduces
+     activation memory during the backward pass.
+  2. Enable gradient checkpointing to trade compute for memory:
+     model.gradient_checkpointing_enable()
+     or set gradient_checkpointing=True in TrainingArguments.
+  3. Tune PyTorch's memory allocator:
+     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+     This can reduce fragmentation-related OOM on newer PyTorch versions.
+  4. If using multi-GPU training, consider reducing the DDP bucket size:
+     TrainingArguments(..., ddp_bucket_cap_mb=25)
+  5. Consider using DeepSpeed ZeRO Stage 2 or 3 to shard optimizer
+     states and gradients across GPUs.

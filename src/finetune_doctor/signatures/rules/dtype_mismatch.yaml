@@ -1,0 +1,51 @@
+# dtype_mismatch.yaml — finetune-doctor signature
+#
+# Matches RuntimeError with dtype mismatch phrasing that occurs when
+# parts of the model, optimizer, or input tensors are in different
+# precisions (e.g. bf16 vs fp16 vs fp32).
+#
+# Modeled on real PyTorch errors:
+#   RuntimeError: expected mat1 and mat2 to have the same dtype,
+#     but got Float and Half
+#   RuntimeError: expected scalar type BFloat16 but found Float
+
+id: dtype_mismatch
+name: "Dtype mismatch between model components"
+specificity: 65
+
+match:
+  exception_type: "RuntimeError"
+  traceback_contains_any:
+    - "expected mat1 and mat2 to have the same dtype"
+    - "expected scalar type"
+    - "but found Half"
+    - "but found Float"
+    - "but found BFloat16"
+    - "dtype mismatch"
+
+explanation: >
+  Part of the model or optimizer state is in a different numerical
+  precision (e.g. bf16 vs fp16 vs fp32) than another part.  This
+  typically happens when the model loading dtype, the training precision
+  flag (fp16/bf16 in TrainingArguments), and any torch.autocast settings
+  don't agree with each other — or when a quantized model (e.g. 4-bit
+  via bitsandbytes) is combined with training flags that expect a
+  different precision.
+
+fix: >
+  1. Check that your model loading dtype matches your training precision:
+     - If using bf16 training, load the model in bf16:
+       model = AutoModelForCausalLM.from_pretrained(..., torch_dtype=torch.bfloat16)
+     - If using fp16 training, load in fp16 or fp32 (fp32 will be
+       downcast by the trainer).
+
+  2. Verify your TrainingArguments precision flags:
+     - Use bf16=True OR fp16=True, never both.
+     - If your GPU doesn't support bf16 (pre-Ampere), use fp16=True.
+
+  3. If using bitsandbytes quantization (4-bit/8-bit), ensure the
+     compute_dtype in BitsAndBytesConfig matches your training precision:
+       BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+
+  4. Check for manual torch.autocast() calls that might be using a
+     different dtype than the trainer expects.

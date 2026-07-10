@@ -1,0 +1,48 @@
+# flash_attention_build_failure.yaml — finetune-doctor signature
+#
+# Matches ImportError when flash-attention fails to import or compile.
+# Common on systems with mismatched CUDA compute capability or when
+# flash-attn was installed against a different torch/CUDA version.
+#
+# Modeled on real errors:
+#   ImportError: cannot import name 'flash_attn_func' from 'flash_attn'
+#   ImportError: flash_attn_2_cuda.cpython-311-x86_64-linux-gnu.so: undefined symbol
+#   RuntimeError: FlashAttention only supports Ampere GPUs or newer
+#
+# NOTE: We match on "flash_attn" or "flash-attn" or "FlashAttention"
+# appearing in the traceback.  These are highly specific to the
+# flash-attention library and unlikely to appear in unrelated errors.
+
+id: flash_attention_build_failure
+name: "Flash Attention failed to import or compile"
+specificity: 50
+
+match:
+  exception_type: "ImportError"
+  traceback_contains_any:
+    - "flash_attn"
+    - "flash-attn"
+    - "FlashAttention"
+
+explanation: >
+  The flash-attention library failed to import, likely because it was
+  compiled against a different CUDA version or PyTorch version than
+  what's currently installed, or because the GPU's compute capability
+  is below the minimum required (Ampere / SM80+).  Flash attention
+  requires specific GPU hardware and a matching compiled binary.
+
+fix: >
+  1. Check your GPU's compute capability — FlashAttention v2 requires
+     Ampere (SM80) or newer (A100, RTX 3090, RTX 4090, H100, etc.).
+     Older GPUs (V100, T4, RTX 2080) are NOT supported.
+  2. Install a prebuilt wheel matching your exact torch + CUDA version:
+     pip install flash-attn --no-build-isolation
+  3. If you don't need flash attention, disable it in your model config:
+     model = AutoModelForCausalLM.from_pretrained(...,
+     attn_implementation="eager")
+     or set attn_implementation="sdpa" to use PyTorch's built-in
+     scaled dot product attention instead.
+  4. Verify CUDA versions match:
+     python -c "import torch; print(torch.version.cuda)"
+     nvcc --version
+     These should be compatible.

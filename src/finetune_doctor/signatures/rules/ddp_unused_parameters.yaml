@@ -1,0 +1,52 @@
+# ddp_unused_parameters.yaml — finetune-doctor signature
+#
+# Matches RuntimeError related to DDP (DistributedDataParallel) failing
+# because some model parameters don't receive gradients in every forward
+# pass.  Common when parts of a model are frozen, conditionally used,
+# or when using LoRA on a partially-frozen base model.
+#
+# Modeled on real PyTorch DDP errors:
+#   RuntimeError: Expected to have finished reduction in the prior iteration
+#     before starting a new one. This error indicates that your module has
+#     parameters that were not used in producing loss.
+#   RuntimeError: It looks like your module has parameters that were not
+#     used in producing its output. You can enable unused parameter
+#     detection by passing the keyword argument `find_unused_parameters=True`
+
+id: ddp_unused_parameters
+name: "DDP fails due to unused parameters"
+specificity: 70
+
+match:
+  exception_type: "RuntimeError"
+  traceback_contains_any:
+    - "find_unused_parameters"
+    - "unused parameters"
+    - "not used in producing loss"
+    - "not used in producing its output"
+    - "Expected to have finished reduction"
+
+explanation: >
+  Some model parameters are not receiving gradients during every forward
+  pass, which breaks PyTorch DistributedDataParallel's default assumption
+  that all parameters participate in every training step.  This is very
+  common when: (a) parts of the model are frozen (e.g. base model with
+  LoRA adapters), (b) the model has conditionally-used branches (e.g.
+  MoE routers), or (c) a multi-task head is selectively activated.
+
+fix: >
+  1. Set ddp_find_unused_parameters=True in your TrainingArguments:
+       TrainingArguments(..., ddp_find_unused_parameters=True)
+     Note: this has a small performance cost (~5-10% slower) because
+     DDP must check which parameters were used each step.
+
+  2. If you're using FSDP instead of DDP, the equivalent is
+     fsdp_config={"use_orig_params": True}.
+
+  3. If performance is critical and you know exactly which parameters
+     are unused, consider removing them from the DDP wrapper or
+     explicitly setting their requires_grad=False before wrapping.
+
+  4. If using Hugging Face Trainer, you can also try setting
+     ddp_find_unused_parameters in the deepspeed config or via
+     environment variable NCCL_FIND_UNUSED_PARAMETERS=1.

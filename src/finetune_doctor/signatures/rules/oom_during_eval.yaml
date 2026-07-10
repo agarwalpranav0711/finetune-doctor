@@ -1,0 +1,41 @@
+# oom_during_eval.yaml — finetune-doctor signature
+#
+# Matches OutOfMemoryError exceptions whose traceback contains evidence that
+# the crash happened inside Hugging Face's *evaluation* loop rather than during
+# the forward/backward training step.
+
+id: oom_during_eval
+name: "Out of memory during evaluation, not training"
+specificity: 80
+
+match:
+  exception_type: "OutOfMemoryError"
+  traceback_contains_any:
+    - "evaluation_loop"
+    - "prediction_step"
+    - "eval_loop"
+
+explanation: >
+  Training itself fits in memory, but evaluation is using a larger effective
+  batch size or longer sequences than training, causing a separate
+  out-of-memory crash during the eval step.  This is one of the most common
+  surprise OOM failures — people expect that if training works, eval should
+  too, but eval can silently use the training batch size (which is often
+  larger than needed for inference) and may process un-truncated sequences.
+
+fix: >
+  Try one or more of the following:
+
+  1. Set a smaller per_device_eval_batch_size — often half of your training
+     batch size is enough.
+
+  2. If your eval dataset contains sequences longer than your training
+     max_seq_length, truncate them or set max_length explicitly in the
+     generation/evaluation config.
+
+  3. Disable evaluation during training entirely
+     (evaluation_strategy="no" in TrainingArguments) and run evaluation as
+     a separate pass afterward, when the training graph has been freed.
+
+  4. Add torch.cuda.empty_cache() in a custom callback before each
+     evaluation step to reclaim fragmented memory.

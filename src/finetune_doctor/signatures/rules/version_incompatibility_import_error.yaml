@@ -1,0 +1,47 @@
+# version_incompatibility_import_error.yaml — finetune-doctor signature
+#
+# Matches ImportError or ModuleNotFoundError at import time from a
+# bitsandbytes/CUDA/torch version mismatch.
+#
+# Modeled on real errors:
+#   ImportError: libbitsandbytes_cuda118.so: cannot open shared object file
+#   ImportError: Using RTX 4000 series but no CUDA version detected
+#   RuntimeError: Failed to import transformers.xxx due to ... CUDA ...
+#
+# NOTE: This signature's matching string "CUDA" + ImportError is relatively
+# broad.  A false positive is possible if a completely unrelated ImportError
+# happens to mention CUDA in its traceback.  This is flagged at specificity
+# 55 — below more targeted signatures — and should be refined with more
+# real-world examples over time.
+
+id: version_incompatibility_import_error
+name: "CUDA/library version incompatibility at import time"
+specificity: 55
+
+match:
+  exception_type: "ImportError"
+  traceback_contains_any:
+    - "CUDA"
+    - "bitsandbytes"
+    - "triton"
+
+explanation: >
+  A library failed to import because of a version mismatch between
+  PyTorch, CUDA, and/or bitsandbytes.  This commonly happens when the
+  installed version of bitsandbytes was compiled against a different
+  CUDA version than the one PyTorch is using, or when the system CUDA
+  toolkit version doesn't match what the Python packages expect.
+
+fix: >
+  1. Check your CUDA version: run `nvidia-smi` (driver CUDA version)
+     and `python -c "import torch; print(torch.version.cuda)"` (PyTorch
+     CUDA version).  These should be compatible.
+  2. Reinstall bitsandbytes matching your CUDA version:
+     pip install bitsandbytes --force-reinstall
+  3. If using conda, ensure the cudatoolkit version matches:
+     conda install cudatoolkit=11.8 (or 12.1, etc.)
+  4. For triton errors, install the version matching your PyTorch:
+     pip install triton==2.1.0 (check PyTorch docs for the right version)
+  5. If none of the above helps, try installing PyTorch with a specific
+     CUDA version: pip install torch --index-url
+     https://download.pytorch.org/whl/cu118

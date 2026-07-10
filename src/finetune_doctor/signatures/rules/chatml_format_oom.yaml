@@ -1,0 +1,43 @@
+# chatml_format_oom.yaml — finetune-doctor signature
+#
+# Matches OutOfMemoryError when the user has explicitly indicated they
+# are using a ChatML/messages-format dataset via the dataset_format_hint
+# parameter.  ChatML tokenization produces longer effective sequences
+# than flat-format data at the same nominal cutoff_len.
+#
+# KNOWN LIMITATION: this signature currently requires the user to pass
+# dataset_format_hint="chatml" explicitly via:
+#   with watch(dataset_format_hint="chatml"): ...
+# It does NOT auto-detect the dataset format.  Auto-detection is planned
+# for a future chunk.
+
+id: chatml_format_oom
+name: "Out of memory with ChatML/messages-format dataset"
+specificity: 70
+
+match:
+  exception_type: "OutOfMemoryError"
+  dataset_format_hint: "chatml"
+
+explanation: >
+  You're using a ChatML (messages-format) dataset, which typically
+  tokenizes to longer effective sequences than flat prompt/completion
+  data at the same nominal cutoff_len.  The chat template tokens
+  (system/user/assistant role markers, BOS/EOS per turn, etc.) add
+  overhead per conversation turn, so a multi-turn chat can easily exceed
+  your cutoff_len and consume more memory than expected.
+
+fix: >
+  1. Check the actual tokenized sequence lengths for your chat-formatted
+     data — don't rely on the raw text length.  Print
+     tokenizer(example, return_length=True) for a few samples to see the
+     real token counts.
+
+  2. Reduce cutoff_len / max_seq_length to a value that fits your GPU,
+     or enable truncation explicitly.
+
+  3. If you have multi-turn conversations, consider splitting very long
+     conversations into shorter windows.
+
+  4. Reduce per_device_train_batch_size — the longer sequences from
+     ChatML formatting compound the memory impact of each batch.

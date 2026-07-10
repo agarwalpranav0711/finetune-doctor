@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finetune-doctor"
+version = "0.1.0"
+description = "Catches LLM fine-tuning failures the moment they happen, explains why in plain English, and tells you exactly how to fix them."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "finetune-doctor contributors"},
+]
+keywords = ["llm", "fine-tuning", "debugging", "lora", "qlora", "unsloth", "transformers"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Debuggers",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0",
+    "psutil>=5.9.0",
+    "nvidia-ml-py>=12.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+finetune-doctor = "finetune_doctor.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/finetune-doctor/finetune-doctor"
+Issues = "https://github.com/finetune-doctor/finetune-doctor/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+finetune_doctor = ["signatures/rules/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

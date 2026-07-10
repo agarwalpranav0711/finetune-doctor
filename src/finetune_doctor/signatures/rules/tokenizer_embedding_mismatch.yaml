@@ -1,0 +1,38 @@
+# tokenizer_embedding_mismatch.yaml — finetune-doctor signature
+#
+# Matches RuntimeError when added special tokens expand the tokenizer's
+# vocabulary but the model's embedding matrix wasn't resized to match.
+#
+# Modeled on real errors:
+#   RuntimeError: index out of range in self
+#   IndexError: index out of range in self
+# occurring in torch.nn.Embedding.forward when a token ID exceeds the
+# embedding matrix row count.
+
+id: tokenizer_embedding_mismatch
+name: "Tokenizer vocab size exceeds model embedding matrix"
+specificity: 70
+
+match:
+  exception_type: "RuntimeError"
+  traceback_contains_any:
+    - "index out of range in self"
+    - "Embedding"
+
+explanation: >
+  The tokenizer has more tokens than the model's embedding matrix has
+  rows.  This almost always happens when you add special tokens to the
+  tokenizer (e.g. chat template tokens like <|im_start|>, <|im_end|>,
+  pad tokens) but forget to call model.resize_token_embeddings() to
+  expand the embedding layer to match the new vocabulary size.
+
+fix: >
+  After adding tokens to the tokenizer, resize the model's embeddings:
+
+  tokenizer.add_special_tokens({"pad_token": "<pad>"})
+  model.resize_token_embeddings(len(tokenizer))
+
+  Do this BEFORE wrapping the model with get_peft_model() or starting
+  training.  If using Unsloth, this is handled automatically — but if
+  you're adding tokens manually with a vanilla Transformers setup, you
+  must call resize_token_embeddings yourself.
