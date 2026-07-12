@@ -39,7 +39,25 @@ from finetune_doctor.capture import CapturedContext, capture
 from finetune_doctor.matcher import match
 from finetune_doctor.signatures.loader import Signature, load_signatures
 
+# Reconfigure streams to UTF-8 on Windows if possible
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
 console = Console(stderr=True)
+
+
+def _get_safe_symbol(symbol: str, fallback: str) -> str:
+    """Return the symbol if the console's encoding supports it, else the fallback."""
+    encoding = getattr(console, "encoding", "utf-8") or "utf-8"
+    try:
+        symbol.encode(encoding)
+        return symbol
+    except Exception:
+        return fallback
 
 
 # ── Pretty output ───────────────────────────────────────────────────────────
@@ -52,7 +70,8 @@ def _render_diagnosis(sig: Signature, ctx: CapturedContext) -> None:
     lines = []
 
     # Header: signature name
-    lines.append(f"[bold bright_red]⚠  {sig.name}[/bold bright_red]")
+    warning_sym = _get_safe_symbol("⚠", "WARNING:")
+    lines.append(f"[bold bright_red]{warning_sym}  {sig.name}[/bold bright_red]")
     lines.append("")
 
     # What went wrong
@@ -74,11 +93,13 @@ def _render_diagnosis(sig: Signature, ctx: CapturedContext) -> None:
 
     body = "\n".join(lines)
 
+    doc_sym = _get_safe_symbol("🩺", "[finetune-doctor]")
+
     console.print()
     console.print(
         Panel(
             body,
-            title="[bold yellow]🩺 finetune-doctor diagnosis[/bold yellow]",
+            title=f"[bold yellow]{doc_sym} finetune-doctor diagnosis[/bold yellow]",
             border_style="bright_yellow",
             padding=(1, 2),
             expand=True,

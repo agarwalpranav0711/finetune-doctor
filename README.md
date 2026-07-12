@@ -200,7 +200,7 @@ Then open a PR. No Python code changes needed — just the YAML file.
 - **No LLM fallback:** there's no AI-powered diagnosis for unknown failures yet. When no signature matches, you get the raw traceback plus a pointer to open an issue.
 - **CLI package versions reflect the outer environment:** when using `finetune-doctor run --`, package versions are detected from the environment where finetune-doctor is installed. If the subprocess uses a different virtualenv or conda environment, the reported versions may not match what the training script actually used. This will be addressed in a future chunk.
 - **Signatures needing real-world refinement:** The `version_incompatibility_import_error` signature relies on the string "CUDA" in an `ImportError`. This is broad and may be prone to false positives; it is flagged as "may need tightening based on real-world reports."
-- **Not on PyPI:** install from source with `pip install -e .` for now.
+- **Not on PyPI:** install from source with `pip install -e ".[dev]"` for now.
 
 ### How the CLI captures GPU stats
 

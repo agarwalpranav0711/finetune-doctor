@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import platform
 import subprocess
 import sys
@@ -25,22 +26,25 @@ import threading
 from typing import List, Optional
 
 import typer
-from rich.console import Console
 
 from finetune_doctor import __version__
 from finetune_doctor.capture import CapturedContext
 from finetune_doctor.gpu_poller import GpuPoller
 from finetune_doctor.matcher import match
 from finetune_doctor.signatures.loader import load_signatures
-from finetune_doctor.watch import _render_diagnosis, _render_no_match
+from finetune_doctor.watch import (
+    _render_diagnosis,
+    _render_no_match,
+    console,
+    _get_safe_symbol,
+)
 
 app = typer.Typer(
     name="finetune-doctor",
-    help="🩺 Catches LLM fine-tuning failures and explains them in plain English.",
+    help="Catches LLM fine-tuning failures and explains them in plain English.",
     add_completion=False,
     no_args_is_help=True,
 )
-console = Console(stderr=True)
 
 
 def _version_callback(value: bool) -> None:
@@ -79,8 +83,9 @@ def run(
         console.print("[red]Error: no command provided.[/red]")
         raise typer.Exit(code=1)
 
+    doc_sym = _get_safe_symbol("🩺", "[finetune-doctor]")
     console.print(
-        f"[bold cyan]🩺 finetune-doctor[/bold cyan] wrapping: "
+        f"[bold cyan]{doc_sym} finetune-doctor[/bold cyan] wrapping: "
         f"[dim]{' '.join(command)}[/dim]"
     )
     console.print()
@@ -92,12 +97,18 @@ def run(
     # ── Launch subprocess with piped stderr (stdout passed through) ─────
     stderr_chunks: List[str] = []
 
+    # Configure env to enforce UTF-8 output from Python subprocesses
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+
     try:
         proc = subprocess.Popen(
             command,
             stdout=None,           # inherit — streams directly to terminal
             stderr=subprocess.PIPE,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
             bufsize=1,             # line-buffered
         )
 
@@ -125,8 +136,9 @@ def run(
 
     # ── Handle success ──────────────────────────────────────────────────
     if returncode == 0:
+        success_sym = _get_safe_symbol("✅", "SUCCESS:")
         console.print(
-            "[bold green]✅ Command completed successfully.[/bold green]"
+            f"[bold green]{success_sym} Command completed successfully.[/bold green]"
         )
         return
 
